@@ -10,7 +10,7 @@ The official [HelpBento](https://helpbento.com) marketplace for
 ## Install
 
 ```bash
-claude plugin marketplace add helpbento/claude-plugins
+claude plugin marketplace add BentoSoftware/claude-plugins
 claude plugin install helpbento@helpbento
 ```
 
