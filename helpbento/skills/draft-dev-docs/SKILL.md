@@ -19,6 +19,7 @@ allowed-tools:
   - mcp__plugin_helpbento_helpbento__create_knowledge_base
   - mcp__plugin_helpbento_helpbento__update_knowledge_base
   - mcp__plugin_helpbento_helpbento__list_categories
+  - mcp__plugin_helpbento_helpbento__list_category_articles
   - mcp__plugin_helpbento_helpbento__list_doc_versions
   - mcp__plugin_helpbento_helpbento__list_api_specs
   - mcp__plugin_helpbento_helpbento__search_articles
@@ -29,6 +30,8 @@ allowed-tools:
   - mcp__plugin_helpbento_helpbento__update_article
   - mcp__plugin_helpbento_helpbento__create_category
   - mcp__plugin_helpbento_helpbento__update_category
+  - mcp__plugin_helpbento_helpbento__reorder_categories
+  - mcp__plugin_helpbento_helpbento__reorder_articles
   - mcp__plugin_helpbento_helpbento__create_doc_version
   - mcp__plugin_helpbento_helpbento__refresh_api_spec
   - mcp__plugin_helpbento_helpbento__update_dev_docs_release_notes
@@ -110,6 +113,8 @@ retry — don't retry blindly.
 - `search_articles { q, mode?, knowledgeBaseId? }`, `get_article { articleId }`, `create_draft_article`, `update_article` — pages are articles; see Step 3. `search_articles` `mode` is `full-text` (default) / `title` / `semantic`.
 - `find_articles_for_symbols { symbols, knowledgeBaseId? }` — after an API changes (renamed endpoint, param, or flag), find the doc pages that still mention the OLD names, then offer to update them (Step 3 revise flow). Discovery only.
 - `create_category`, `update_category` — sections are categories; see Step 4.
+- `list_categories` → `[{ id, name, slug, knowledgeBaseId, parentId, docVersionId?, order }]`; `list_category_articles { categoryId }` → the section's pages in order, `[{ id, title, slug, status, order }]`.
+- `reorder_categories { categoryIds }`, `reorder_articles { articleIds }` — set the order of sections / of the pages in a section. LIVE, no draft step; see Step 4.
 - `create_doc_version { knowledgeBaseId, label, slug?, fromVersionId? }` — see Step 6.
 - `refresh_api_spec { spec, knowledgeBaseId?, apiSpecId?, …, confirmLiveOverwrite? }` — see Step 5.
 - `update_dev_docs_release_notes { knowledgeBaseId, docVersionId, markdown, confirmLiveUpdate? }` — see Step 7.
@@ -248,6 +253,16 @@ one is LIVE. Only do it when the user asked or confirmed the name + KB + version
 
 - **Create:** `create_category { name, knowledgeBaseId, docVersionId?, description?, parentId? }` (created unpublished; a human publishes). Use the returned `categoryId` as a page's/spec's `categoryId`.
 - **Rename / re-nest:** `update_category { categoryId, … }` — confirm first (a rename changes the public URL).
+- **Reorder sections:** `reorder_categories { categoryIds }` with **every** section
+  that shares one version and parent (from `list_categories`: same `knowledgeBaseId`,
+  `docVersionId` and `parentId`), top-to-bottom. A partial list is rejected. At the
+  top level, API references keep their place in the sidebar and the sections fill
+  the slots around them.
+- **Reorder pages in a section:** `list_category_articles { categoryId }`, then
+  `reorder_articles { articleIds }` with **every** id it returned, in the new order.
+- Both reorders are LIVE with **no draft step**: the public sidebar changes as
+  soon as you call them, even on a public version. Only reorder when the user
+  asked; show the proposed order and get a yes first.
 
 ## Step 5 — API references (from an OpenAPI spec)
 

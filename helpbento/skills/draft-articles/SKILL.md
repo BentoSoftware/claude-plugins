@@ -12,6 +12,7 @@ description: >-
   the edits back as a draft. Never publishes.
 allowed-tools:
   - mcp__plugin_helpbento_helpbento__list_categories
+  - mcp__plugin_helpbento_helpbento__list_category_articles
   - mcp__plugin_helpbento_helpbento__list_tags
   - mcp__plugin_helpbento_helpbento__list_knowledge_bases
   - mcp__plugin_helpbento_helpbento__get_writing_settings
@@ -28,6 +29,8 @@ allowed-tools:
   - mcp__plugin_helpbento_helpbento__unarchive_article
   - mcp__plugin_helpbento_helpbento__create_category
   - mcp__plugin_helpbento_helpbento__update_category
+  - mcp__plugin_helpbento_helpbento__reorder_categories
+  - mcp__plugin_helpbento_helpbento__reorder_articles
   - mcp__plugin_helpbento_helpbento__upload_image
   - Bash(node:*)
   - Bash(git:*)
@@ -62,7 +65,8 @@ Use the plugin's **MCP tools**. They're served by HelpBento over an
 authenticated connection — the user connects once via a browser login (Claude
 Code manages the OAuth tokens), so you never handle any credentials:
 
-- `mcp__plugin_helpbento_helpbento__list_categories` — active categories `{ id, name, slug, knowledgeBaseId }`.
+- `mcp__plugin_helpbento_helpbento__list_categories` — active categories `{ id, name, slug, knowledgeBaseId, parentId, docVersionId?, order }`. Categories sharing `knowledgeBaseId` + `parentId` (null = top level) are one sibling group, shown in ascending `order`.
+- `mcp__plugin_helpbento_helpbento__list_category_articles` — args `{ categoryId }`; every non-trashed article in that category (drafts and archived included) in display order: `[{ id, title, slug, status, order }]`. Read-only.
 - `mcp__plugin_helpbento_helpbento__list_tags` — the company's EXISTING tags `{ id, name, color }`. These are the ONLY tags you may apply; you cannot create tags.
 - `mcp__plugin_helpbento_helpbento__list_knowledge_bases` — `{ id, name, slug, visibility }`.
 - `mcp__plugin_helpbento_helpbento__get_writing_settings` — `{ aiAssistantEnabled, defaultTone, companyContext }`: the company's AI Article Assistant settings. See **Step 0**.
@@ -74,6 +78,8 @@ Code manages the OAuth tokens), so you never handle any credentials:
 - `mcp__plugin_helpbento_helpbento__update_article` — args `{ articleId, markdown, title?, excerpt?, tags?, categoryId? }`; works on any article (draft **or published**). ALL edits — body AND title/excerpt/tags/categoryId — land as a DRAFT and never publish: on a published article they are held in the draft and only go live when a human clicks Publish, so the public title and URL stay unchanged until then. `tags` are ids/names from `list_tags` (unknown tags are ignored). Returns `{ articleId, versionId, status, adminUrl, ignoredTags }`.
 - `mcp__plugin_helpbento_helpbento__create_category` — args `{ name, knowledgeBaseId?, description?, parentId? }`; creates a LIVE (but unpublished) category. Returns `{ categoryId, name, manageUrl }`.
 - `mcp__plugin_helpbento_helpbento__update_category` — args `{ categoryId, name?, description?, parentId? }`; renames/edits a category (a LIVE change). Returns `{ categoryId, manageUrl }`.
+- `mcp__plugin_helpbento_helpbento__reorder_categories` — args `{ categoryIds }`: EVERY category in one sibling group, in the new top-to-bottom order. A LIVE change with no draft step. Returns `{ categoryIds, manageUrl }`. See **Arranging categories and articles**.
+- `mcp__plugin_helpbento_helpbento__reorder_articles` — args `{ articleIds }`: EVERY article `list_category_articles` returns for one category, in the new order. A LIVE change with no draft step, even for published articles. Returns `{ categoryId, articleIds, manageUrl }`. See **Arranging categories and articles**.
 - `mcp__plugin_helpbento_helpbento__upload_image` — args `{ articleId, svg }` for a UI mockup you drew (SVG as plain text; sanitized server-side) or `{ articleId, contentType, dataBase64 }` for a real screenshot. Returns `{ path, url }` to embed (plus `removed` and `notice` for an SVG). See **Generating UI mockups** / **Uploading real images**.
 
 If a tool fails with an authentication error (e.g. the user hasn't connected
@@ -527,9 +533,31 @@ actions:
 - **Edit:** `update_category { categoryId, name?, description?, parentId? }` to
   rename, retitle, or re-nest. Because a rename changes the public URL, say what
   you're about to change and get a yes first.
-- **Out of scope:** you can't delete categories, reorder them, or change their
-  publish state. Leave those to a human in HelpBento. (You *can* create/update
-  knowledge bases — see below.)
+- **Reorder:** see **Arranging categories and articles** below.
+- **Out of scope:** you can't delete categories or change their publish state.
+  Leave those to a human in HelpBento. (You *can* create/update knowledge bases —
+  see below.)
+
+## Arranging categories and articles
+
+You can set the display order of categories and of the articles inside a
+category. Like other category changes this is LIVE: there is **no draft step**,
+so the new order shows on the public help center as soon as you call the tool,
+including for published articles.
+
+- **Only when asked or confirmed.** Never reorder on your own initiative (for
+  example while drafting an article). When the user asks, show the proposed
+  top-to-bottom order and get a yes before calling the tool.
+- **Categories:** call `list_categories`, take ONE sibling group (same
+  `knowledgeBaseId` and `parentId`), and pass **every** id in that group to
+  `reorder_categories { categoryIds }` in the new order. A partial list is
+  rejected, and the error names the missing ids. To move a category to a
+  different parent, use `update_category { parentId }` first; that is a separate
+  change.
+- **Articles:** call `list_category_articles { categoryId }`, then pass **every**
+  id it returns to `reorder_articles { articleIds }` in the new order. Drafts and
+  archived articles keep a slot too. To move an article to a different category,
+  use `update_article { categoryId }` instead (that edit is staged as a draft).
 
 ## Managing knowledge bases
 
